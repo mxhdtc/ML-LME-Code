@@ -1,0 +1,24 @@
+%This doc is to deal with the noise of gray picture by Matlab2016b
+%input: the binary graph and original gray picture
+%output: deal with noise picture Img
+
+img=imread('C:\Users\12417\Desktop\分形水稻数据\二值图\第一批\003-4_0.png');
+img1=imread('C:\Users\12417\Desktop\分形水稻数据\第一批\003-4_0.png');
+img1=rgb2gray(img1);
+%imshow(img);
+img1=img1';
+%imshow(img1);
+[M,N]=size(img);
+img1=double(img1);
+img=double(img);
+for i=1:M
+    for j=1:N
+        if(img(i,j)==0)
+            Img(i,j)=0;
+        end
+        if(img(i,j)==255)
+            Img(i,j)=img1(i,j);
+        end
+    end
+end
+imshow(Img);

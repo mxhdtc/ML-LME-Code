@@ -1,0 +1,45 @@
+%this function is to get FBC dimension from gray graph
+% input: img
+% output: the FBC dimension
+function dim=FBC(img)
+[M,N]=size(img);
+t=fix(log2(min([M,N])));
+r=1:t;
+Er=zeros(1,t);
+for i=1:t
+    Er(i)=FBC_0(img,r(i));
+end
+p=polyfit(log10(r),log10(Er),1);
+dim=3-p(1);
+end
+
+%run FBC_0 in advance
+function E=FBC_0(img,r)
+[M,N]=size(img);
+sum=0;
+G=0;
+img=double(img);
+for i=1:M
+    for j=1:N
+        if(i-r>0)
+            G=G+abs(img(i-r,j)-img(i,j));
+            sum=sum+1;
+        end
+        if(i+r<M)
+            G=G+abs(img(i+r,j)-img(i,j));
+            sum=sum+1;
+        end
+        if(j-r>0)
+            G=G+abs(img(i,j-r)-img(i,j));
+            sum=sum+1;
+        end
+        if(j+r<N)
+            G=G+abs(img(i,j+r)-img(i,j));
+            sum=sum+1;
+        end
+    end
+end
+E=G/sum;
+end
+
+        

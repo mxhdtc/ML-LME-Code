@@ -1,0 +1,26 @@
+%this doc is to Process Binary Graph Folder
+%input: the file_path
+%output: get the DBC dimension of all binary graph
+
+file_path1 = 'C:\Users\12417\Desktop\分形水稻数据\二值图\第三批\';% Image folder path
+img_path_list1 = dir(strcat(file_path1,'*.png'));%Get all png format images in the folder
+img_num = length(img_path_list1);%Get the total number of images
+D_num3=zeros(1,img_num);
+erronum=0;
+if img_num > 0 %There are images that meet the conditions
+        for j = 1:img_num %Read the images one by one
+            try
+            image_name1 = img_path_list1(j).name;% Image name
+            image1 =  imread(strcat(file_path1,image_name1));
+            [M,N]=size(image1);
+            img1=double(image1);
+            img1(img1>=255)=1;
+            %Binary graph processing code
+            D_num3(j)=D(img1);
+            catch
+                D_num3(j)=0;
+                disp(j);
+                erronum=erronum+1;
+            end
+        end
+end

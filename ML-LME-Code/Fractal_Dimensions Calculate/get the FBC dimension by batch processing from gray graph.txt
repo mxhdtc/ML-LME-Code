@@ -1,0 +1,113 @@
+% this function is to get all FBC dimension by processing Grayscale folder 
+% input: the file_path
+% output: all fo the FBC dimension of gray graph
+
+file_path1 =  'C:\Users\12417\Desktop\分形水稻数据\第一批\';% Image folder path
+file_path2 =  'C:\Users\12417\Desktop\分形水稻数据\二值图\第一批\';
+
+file_path3 =  'C:\Users\12417\Desktop\分形水稻数据\第二批\';% Image folder path
+file_path4 =  'C:\Users\12417\Desktop\分形水稻数据\二值图\第二批\';
+
+img_path_list1 = dir(strcat(file_path1,'*.png'));%Get all png format images in the folder
+img_path_list2 = dir(strcat(file_path2,'*.png'));
+
+img_path_list3 = dir(strcat(file_path3,'*.png'));%Get all png format images in the folder
+img_path_list4 = dir(strcat(file_path4,'*.png'));
+
+img_num12 = length(img_path_list1);%Get the total number of images
+img_num34 = length(img_path_list3);
+
+FBC_num12 = zeros(1,img_num12);
+FBC_num34 = zeros(1,img_num34);
+erronum12 = 0;
+erronum34 = 0;
+
+if img_num12 > 0 %There are images that meet the conditions
+        for j = 1:img_num12 %Read the images one by one
+            try  %异常处理
+            image_name1 = img_path_list1(j).name;% Image name
+            image1 =  imread(strcat(file_path1,image_name1));
+            
+            image_name2 = img_path_list2(j).name;% Image name
+            image2 =  imread(strcat(file_path2,image_name2));
+            %fprintf('%d %d %s\n',i,j,strcat(file_path,image_name));% Display the name of the image being processed
+            %Image processing process FBC algorithm flow
+            img1=rgb2gray(image1);
+            [M,N]=size(img1);
+            if M<N
+                 img1=img1';
+            end
+            [M,N]=size(image2);
+            img1=double(img1);
+            img2=double(image2);
+            Img=zeros(M,N);
+            for m=1:M
+                 for n=1:N
+                     if(img2(m,n)==255)
+                       Img(m,n)=img1(m,n);
+                     end
+                 end
+            end
+            FBC_num12(j)=FBC(Img);
+            catch
+                FBC_num12(j)=0;
+                disp(j);
+                erronum12=erronum12+1;
+            end
+        end
+end
+
+if img_num34 > 0 %There are images that meet the conditions
+        for j = 1:img_num34 %Read the images one by one
+            try  %Exception handling
+            image_name3 = img_path_list3(j).name;% Image name
+            image3 =  imread(strcat(file_path3,image_name3));
+            image_name4 = img_path_list4(j).name;% Image name
+            image4 =  imread(strcat(file_path4,image_name4));
+            %fprintf('%d %d %s\n',i,j,strcat(file_path,image_name));% Display the name of the image being processed
+            %图像处理过程 FBC算法流程
+            img3=rgb2gray(image3);
+            [M,N]=size(img3);
+            if M<N
+                 img3=img3';
+            end
+            [M,N]=size(image4);
+            img3=double(img3);
+            img4=double(image4);
+            Img=zeros(M,N);
+            for m=1:M
+                 for n=1:N
+                     if(img4(m,n)==255)
+                       Img(m,n)=img3(m,n);
+                     end
+                 end
+            end
+            FBC_num34(j)=FBC(Img);
+            catch
+                FBC_num34(j)=0;
+                disp(j);
+                erronum34=erronum34+1;
+            end
+        end
+end
+
+
+n=1;
+m=img_num12/12;
+FBC_first=zeros(m,12);
+for i=1:m
+    for j=1:12
+        FBC_first(i,j)=FBC_num12(n);
+        n=n+1;
+    end
+end
+
+n=1;
+m=img_num34/12;
+FBC_second=zeros(m,12);
+for i=1:m
+    for j=1:12
+        FBC_second(i,j)=FBC_num34(n);
+        n=n+1;
+    end
+end

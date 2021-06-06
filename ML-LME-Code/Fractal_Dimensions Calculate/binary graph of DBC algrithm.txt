@@ -1,0 +1,33 @@
+function dim = D(img)
+% this function is to get the DBC dimension of binary graph 
+% input: the img of binary graph
+% output: the DBC dimension dim
+%   img is a square matrix and a power of 2
+B=size(img,1);
+M=size(img,1);
+t=fix(log2(B));
+s=2.^(1:t);
+Nr=zeros(1,t);
+r=s/M;
+for i = 1:t
+    Nr(i)=D_0(img,s(i));
+end
+p=polyfit(-log10(r),log10(Nr),1);
+dim=p(1);
+end
+
+function Nr=D_0(img,L)
+%UNTITLED4 Show a summary about this function here
+%   Number of grids included in the statistics
+[M,N]=size(img);
+M=min(M,N);
+n=fix(M/L);
+Nr=0;
+for i = 1:n
+    for j = 1:n
+        if sum(sum(img((i-1)*L+1:i*L,(j-1)*L+1:j*L)))~=0
+            Nr=Nr+1;
+        end
+    end
+end
+end

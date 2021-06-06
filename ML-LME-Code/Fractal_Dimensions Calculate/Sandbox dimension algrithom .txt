@@ -1,0 +1,69 @@
+%%this function is to get sandbox dimension from binary graph
+function [r,average_num,DIMENSION,R_2] = sdbox_dim(img,num)
+%% [scale,num,dim,r^2] = sandbox_dim(Image, NPoints)
+%% input: 1. Binary image matrix; 2. Number of points of different scales (not the final number of points, it will be adjusted later)
+%%  output: sandbox dimension
+Image = img;
+NPoints = num;
+if NPoints~=fix(NPoints)
+    error('NPoints should be an integer')
+end
+%% Calculate the center of mass and the distance to the nearest boundary of the center of mass
+[row,column] = size(Image);
+points = find(Image==1);
+[temp1,temp2] = ind2sub(size(Image), points);
+Index_all = cat(2,temp1,temp2);
+mass_center_r = fix(sum(Index_all(:,1))/size(Index_all,1));
+mass_center_c = fix(sum(Index_all(:,2))/size(Index_all,1));
+L_max = min(min([mass_center_r-1,row-mass_center_r]),min([mass_center_c-1,column-mass_center_c]));
+%% Obtain the coordinates of all non-zero points in the area of L_max length from each boundary
+roi = Image(L_max+1:row-L_max,L_max+1:column-L_max);
+Origins = find(roi==1);
+[temp_x,temp_y] = ind2sub(size(roi), Origins);
+Index = cat(2,temp_x,temp_y);
+Index(:,1) = Index(:,1) + L_max;
+Index(:,2) = Index(:,2) + L_max;
+
+%%When NPoints is greater than 0, the progressive relationship between scales is a power relationship with 10 as the base, otherwise it is a linear relationship with 1 as the step length
+
+Lmax = min(round(size(Image)./2));
+if NPoints > 0
+    logL = log10(1) : log10(Lmax)/NPoints : log10(Lmax);
+    pLs = unique(round(10.^logL));
+else
+    pLs = 1 : Lmax;
+end
+%% Calculate the number of pixels contained in boxes of different scales at each starting point, and record the number of pixels contained in boxes of the same scale in the first column
+% Record the frequency of occurrence of the scale in the second column
+num = [0 0];
+for i = 1:size(Index,1)
+    m = Index(i,1);
+    n = Index(i,2) ;
+    edge = min(min([m-1,size(Image,1)-m]),min([n-1,size(Image,2)-n]));
+    Ltmp = pLs(pLs<=edge);
+    for j = 1 : numel(Ltmp)
+        L = Ltmp(j);
+        subA = Image(m-L:m+L,n-L:n+L);
+        if (size(num,1)>=L)
+            num(L,1) = sum(sum(subA)) + num(L,1);
+            num(L,2) = 1 + num(L,2);
+        else
+            num(L,1) = sum(sum(subA));
+            num(L,2) = 1;
+        end
+    end
+end
+%% Keep the counted scale and average the counted pixels
+r = find(num(:,1)~=0);
+nozero_num = num(num(:,1)~=0,:);
+average_num = nozero_num(:,1)./nozero_num(:,2);
+%% Curve fitting to obtain the slope and draw a graph to display
+figure
+[R_2,DIMENSION,B] = regression(log(r)',log(average_num)');
+line_fit = DIMENSION*log(r)+B;
+scatter(log(r),log(average_num));
+hold on
+plot(log(r),line_fit);  
+p=polyfit(log(r),line_fit,1);
+p(1)
+end
