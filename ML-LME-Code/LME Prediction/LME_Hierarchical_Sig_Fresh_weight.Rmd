@@ -1,0 +1,714 @@
+---
+title: "R Notebook::using LME to predict fresh weight of rice "
+output: "LME fitting results"
+  html_document:
+    df_print: paged
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+#  loading required  packages
+library(readr)
+library(PerformanceAnalytics)
+library(lmerTest)
+library(MuMIn)
+library(car)
+attach(iris)
+library(ISLR) 
+library(leaps)
+```
+```{r}
+#  import rice phenotype and fractal dimensions data
+data<-read_csv("~/Desktop/rice_phenotype/rice_data.CSV")
+data1 <- data[, c('PW','PH(V)','PH(V)/PW', 'PH', 'PH/PW', 'SA', 'IFD', 'SFD', 'G_g', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12', 'LD1', 'LD2', 'LD3', 'LD4', 'LD5', 'LD6', '鲜重(g)', '干重(g)', '株高(cm)', '绿叶面积(mm2)')]
+names(data1) <- c('PW','PH(V)','PH(V)/PW', 'PH', 'PH/PW', 'SA', 'IFD', 'SFD', 'G_g', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12', 'LD1', 'LD2', 'LD3', 'LD4', 'LD5', 'LD6', 'fresh_weight', 'dry_weight', 'plant height(cm)', 'green_leaf_area')  # translate the variable name into English
+corr <- cor(data1)  # correlation coefficients between variables
+col<- colorRampPalette(c("blue", "white", "red"))(20)  # Call the color palette to customize the color
+heatmap(x = corr, col = col, symm = TRUE)  # Use heat map to show correlation coefficients between variables
+corr[, c('fresh_weight', 'dry_weight', 'plant height(cm)', 'green_leaf_area')]  # choosing variables with the higher correlation coefficients
+```
+```{r}
+sort(abs(corr[, c('fresh_weight')]))
+```
+
+```{r}
+#  translate the variable name into English
+fresh_weight = data$`鲜重(g)`
+dry_weight = data$`干重(g)`
+plant_height = data$`绿叶面积(mm2)`
+green_leaf_area = data$`绿叶面积(mm2)`
+PH_V = data$`PH(V)`
+data1 <- data.frame(
+  ID = c(1:length(data$ID)),
+  fresh_weight = fresh_weight,
+  dry_weight = dry_weight,
+  plant_height = plant_height,
+  green_leaf_area = green_leaf_area,
+  stage = data$stage, 
+  frac = data$frac, 
+  frac_stage = data$frac_stage,
+  PH_V = PH_V, 
+  SA = data$SA,
+  G_g = data$G_g, 
+  f1 = data$f1,
+  LD1 = data$LD1,
+  PW = data$PW, 
+  SFD = data$SFD,
+  SandBox = data$SandBox,
+  D1 = data$D1, 
+  D2 = data$D2,
+  RFD = data$RFD,
+  frac_SFD = data$frac_SFD,
+  frac_SandBox = data$frac_SandBox,
+  frac_D1 = data$frac_D1,
+  frac_D2 = data$frac_D2,
+  frac_RFD = data$frac_RFD,
+  stage = data$stage,
+  stringsAsFactors=TRUE
+)
+```
+```{r}
+# fitting rice fresh weight using SandBox hierarchies
+# using LME with random slope fitting rice data
+modelmax=lmer(formula = log(fresh_weight)~log(SandBox)+(1+SandBox|frac_SandBox),data=data1)
+# using LME only considering random Intercept
+modelzero=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(SandBox)+(1|frac_SandBox),data=data1)
+linearmodel = lm(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(SandBox),data=data1)
+#summary(modelmax)  # obtain fitting results of modelmax
+#summary(modelzero)  # obtain fitting results of 
+#anova(modelmax)
+#anova(modelzero)
+#anova(modelmax, modelzero)
+
+lme_pred <- predict(modelzero, allow.new.levels = TRUE)
+lm_pred <- predict(linearmodel)
+
+df <- data.frame(x = exp(lm_pred), y = exp(lme_pred))
+
+
+p <- ggplot(data = data.frame(x = exp(lm_pred), y = data1$fresh_weight), mapping = aes(x = x, y = y))
+p + geom_point() + geom_smooth(method = "lm")+labs(x = 'Estimations', y = 'Sample Observations')+theme(title = element_text(size = 20), axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20))+ scale_x_continuous(limits = c(0,710),expand = c(0,0)) + scale_y_continuous(limits = c(0,710),expand = c(0,0))
+
+p <- ggplot(data = data.frame(x = exp(lme_pred), y = data1$fresh_weight), mapping = aes(x = x, y = y))
+p + geom_point() + geom_smooth(method = "lm")+labs(x = 'Estimations', y = 'Sample Observations')+theme(title = element_text(size = 20), axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20)) + scale_x_continuous(limits = c(0,710),expand = c(0,0)) + scale_y_continuous(limits = c(0,710),expand = c(0,0))
+```
+
+```{r}
+# fitting rice fresh weight without fractal hierarchies
+# using LME with random slope fitting rice data
+modelmax=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+(1|stage),data=data1)
+# using LME only considering random Intercept
+modelzero=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+(1|stage),data=data1)
+summary(modelmax)  # obtain fitting results of modelmax
+summary(modelzero)  # obtain fitting results of modelzero
+anova(modelmax)
+anova(modelzero)
+anova(modelmax, modelzero)
+```
+```{r}
+r.squaredLR(modelzero)
+res <- residuals(modelzero)
+OutVals = boxplot(res)$out
+which(res %in% OutVals)
+res <- res[!res %in% OutVals]  # Remove outliers
+shapiro.test(res)
+durbinWatsonTest(res)
+plot(density(res), main = "Empirical probability density function of residuals", sub = "model = fresh weight")  # Plot the residual probability density plot
+qqnorm(res)  # Draw a QQ map
+qqline(res)  # Draw a straight line corresponding to the QQ diagram
+```
+
+```{r}
+# fitting rice fresh weight using RFD hierarchies
+# using LME with random slope fitting rice data
+modelmax=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(RFD)+(1+RFD|frac_RFD),data=data1)
+# using LME only considering random Intercept
+modelzero=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(RFD)+(1|frac_RFD),data=data1)
+summary(modelmax)  # obtain fitting results of modelmax
+summary(modelzero)  # obtain fitting results of 
+anova(modelmax)
+anova(modelzero)
+anova(modelmax, modelzero)
+```
+```{r}
+r.squaredLR(modelzero)
+res <- residuals(modelzero)
+OutVals = boxplot(res)$out
+which(res %in% OutVals)
+res <- res[!res %in% OutVals]  # Remove outliers
+shapiro.test(res)
+durbinWatsonTest(res)
+plot(density(res), main = "Empirical probability density function of residuals", sub = "model = fresh weight")  # Plot the residual probability density plot
+qqnorm(res)  # Draw a QQ map
+qqline(res)  # Draw a straight line corresponding to the QQ diagram
+```
+
+
+```{r}
+# fitting rice fresh weight using DBC2 hierarchies
+# using LME with random slope fitting rice data
+modelmax=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(D2)+(1+D2|frac_D2),data=data1)
+# using LME only considering random Intercept
+modelzero=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(D2)+(1|frac_D2),data=data1)
+summary(modelmax)  # obtain fitting results of modelmax
+summary(modelzero)  # obtain fitting results of 
+anova(modelmax)
+anova(modelzero)
+anova(modelmax, modelzero)
+```
+```{r}
+r.squaredLR(modelzero)
+res <- residuals(modelzero)
+OutVals = boxplot(res)$out
+which(res %in% OutVals)
+res <- res[!res %in% OutVals]  # Remove outliers
+shapiro.test(res)
+durbinWatsonTest(res)
+plot(density(res), main = "Empirical probability density function of residuals", sub = "model = fresh weight")  # Plot the residual probability density plot
+qqnorm(res)  # Draw a QQ map
+qqline(res)  # Draw a straight line corresponding to the QQ diagram
+```
+```{r}
+# fitting rice fresh weight using DBC1 hierarchies
+# using LME with random slope fitting rice data
+modelmax=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(D1)+(1+D1|frac_D1),data=data1)
+# using LME only considering random Intercept
+modelzero=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(D1)+(1|frac_D1),data=data1)
+summary(modelmax)  # obtain fitting results of modelmax
+summary(modelzero)  # obtain fitting results of 
+anova(modelmax)
+anova(modelzero)
+anova(modelmax, modelzero)
+```
+```{r}
+r.squaredLR(modelzero)
+res <- residuals(modelzero)
+OutVals = boxplot(res)$out
+which(res %in% OutVals)
+res <- res[!res %in% OutVals]  # Remove outliers
+shapiro.test(res)
+durbinWatsonTest(res)
+plot(density(res), main = "Empirical probability density function of residuals", sub = "model = fresh weight")  # Plot the residual probability density plot
+qqnorm(res)  # Draw a QQ map
+qqline(res)  # Draw a straight line corresponding to the QQ diagram
+```
+
+```{r}
+# fitting rice fresh weight using SFD hierarchies
+# using LME with random slope fitting rice data
+modelmax=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(SFD)+(1+SFD|frac_SFD),data=data1)
+# using LME only considering random Intercept
+modelzero=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(SFD)+(1|frac_SFD),data=data1)
+summary(modelmax)  # obtain fitting results of modelmax
+summary(modelzero)  # obtain fitting results of 
+anova(modelmax)
+anova(modelzero)
+anova(modelmax, modelzero)
+```
+```{r}
+r.squaredLR(modelzero)
+res <- residuals(modelzero)
+OutVals = boxplot(res)$out
+which(res %in% OutVals)
+res <- res[!res %in% OutVals]  # Remove outliers
+shapiro.test(res)
+durbinWatsonTest(res)
+plot(density(res), main = "Empirical probability density function of residuals", sub = "model = fresh weight")  # Plot the residual probability density plot
+qqnorm(res)  # Draw a QQ map
+qqline(res)  # Draw a straight line corresponding to the QQ diagram
+```
+
+```{r}
+# fitting rice fresh weight using SandBox hierarchies
+# using LME with random slope fitting rice data
+modelmax=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(SandBox)+(1+SandBox|frac_SandBox),data=data1)
+# using LME only considering random Intercept
+modelzero=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(SandBox)+(1|frac_SandBox),data=data1)
+linearmodel = lm(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(SandBox),data=data1)
+#summary(modelmax)  # obtain fitting results of modelmax
+#summary(modelzero)  # obtain fitting results of 
+#anova(modelmax)
+#anova(modelzero)
+#anova(modelmax, modelzero)
+
+lme_pred <- predict(modelzero, allow.new.levels = TRUE)
+lm_pred <- predict(linearmodel)
+
+df <- data.frame(x = exp(lm_pred), y = exp(lme_pred))
+
+
+p <- ggplot(data = data.frame(x = exp(lm_pred), y = data1$fresh_weight), mapping = aes(x = x, y = y))
+p + geom_point() + geom_smooth(method = "lm")+labs(x = 'Estimations', y = 'Sample Observations')+theme(title = element_text(size = 20), axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20))+ scale_x_continuous(limits = c(0,850),expand = c(0,0)) + scale_y_continuous(limits = c(0,850),expand = c(0,0))#画出回归图像
+
+p <- ggplot(data = data.frame(x = exp(lme_pred), y = data1$fresh_weight), mapping = aes(x = x, y = y))
+p + geom_point() + geom_smooth(method = "lm")+labs(x = 'Estimations', y = 'Sample Observations')+theme(title = element_text(size = 20), axis.title.x = element_text(size = 20), axis.title.y = element_text(size = 20)) + scale_x_continuous(limits = c(0,850),expand = c(0,0)) + scale_y_continuous(limits = c(0,850),expand = c(0,0))#画出回归图像
+```
+```{r}
+
+df <- data.frame(x = c(0.1, 0.3, 0.5, 0.7, 0.9, 1.2, 1.5), y = c(0.2, 0.59, 1.03, 1.38, 1.82, 2.37, 3.02))
+lm <- lm(y ~ x, data = df) ### 线性拟合
+pre_y <- predict(lm) ### 在原来自变量上预测
+
+plot1 <- ggplot(data = df, aes(x = x)) + geom_line(aes(y = y, linetype = "实际值", colour = "实际值"), size = 0.8) ### 画实际值得曲线
+plot2 <- plot1 + geom_line(aes(y = pre_y, linetype = "预测值", colour = "预测值"), size = 0.8) ### 画预测值曲线
+
+plot2 + scale_linetype_manual(name = "", values = c("实际值" = "solid", "预测值" = "twodash")) +
+  scale_colour_manual(name = "", values = c("实际值" = "red", "预测值" = "blue"))  ### 设置图例
+```
+```{r}
+data.frame(x = lm_pred, y = lm_pred)
+```
+
+```{r}
+r.squaredLR(modelzero)
+res <- residuals(modelzero)
+OutVals = boxplot(res)$out
+which(res %in% OutVals)
+res <- res[!res %in% OutVals]  # Remove outliers
+shapiro.test(res)
+durbinWatsonTest(res)
+plot(density(res), main = "Empirical probability density function of residuals", sub = "model = fresh weight")  # Plot the residual probability density plot
+qqnorm(res)  # Draw a QQ map
+qqline(res)  # Draw a straight line corresponding to the QQ diagram
+```
+```{r}
+linear_model=lm(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW), data=data1)
+r.squaredLR(linear_model)
+res <- residuals(linear_model)
+OutVals = boxplot(res)$out
+which(res %in% OutVals)
+res <- res[!res %in% OutVals]  # Remove outliers
+shapiro.test(res)
+durbinWatsonTest(res)
+plot(density(res), main = "Empirical probability density function of residuals", sub = "model = fresh weight")  # Plot the residual probability density plot
+qqnorm(res)  # Draw a QQ map
+qqline(res)  # Draw a straight line corresponding to the QQ diagram
+```
+
+```{r}
+lme_RMSE <- matrix(0, 50)
+lm_RMSE <- matrix(0, 50)
+for (i in 1:50){
+  stn_intrain <- sample(unique(data1$ID), size = length(unique(data1$ID))*0.9)
+  train <- data1[data1$ID %in% stn_intrain, c('fresh_weight', 'PH_V', 'SA', 'G_g', 'f1', 'LD1', 'PW', 'SandBox', 'frac_SandBox')]
+  test <- data1[!data1$ID %in% stn_intrain, c('fresh_weight', 'PH_V', 'SA', 'G_g', 'f1', 'LD1', 'PW', 'SandBox', 'frac_SandBox')]
+  modelzero=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(SandBox)+(1|frac_SandBox),data=train)
+  linear_model=lm(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(SandBox),data=train)
+  lme_pred <- predict(modelzero, newdata = test, allow.new.levels = TRUE)
+  lm_pred <- predict(linear_model, newdata = test)
+  lme_RMSE[i] <- mean((log(test$fresh_weight) - lme_pred)^2/log(test$fresh_weight)^2)
+  lm_RMSE[i] <- mean((log(test$fresh_weight) - lm_pred)^2/log(test$fresh_weight)^2)
+}
+mean(lme_RMSE)
+mean(lm_RMSE)
+```
+
+```{r}
+# using fractal dimensions predicting phenotype
+# using Ten-fold cross-validation to estimate Generalization error
+k=10
+lme_RMSE <- matrix(0, k)
+lm_RMSE <- matrix(0, k)
+for(i in 1:k){
+    set.seed(i)
+    n=nrow(data1)
+    subn=floor(n/k)
+    location=sample(1: n, n)
+    cv.errors_lme<-matrix(0,k)
+    cv.errors_lm<-matrix(0,k)
+    for(j in 1:k){
+        a <- subn*(j-1)+1
+        b <- subn*j
+        test<-location[c(a:b)]
+        train<-location[-c(a:b)]
+        fit=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(SandBox)+(1|frac_SandBox), data=data1[train, ])
+        lme_pred = predict(fit, newdata=data1[test,], allow.new.levels = TRUE)
+        cv.errors_lme[j]<-mean((exp(lme_pred)-(data1[test, c('fresh_weight')]))^2/(data1[test, c('fresh_weight')])^2)
+        fit=lm(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(SandBox), data=data1[train, ])
+        lm_pred = predict(fit, newdata=data1[test,])
+        cv.errors_lm[j]<-mean((exp(lm_pred)-(data1[test, c('fresh_weight')]))^2/(data1[test, c('fresh_weight')])^2)
+    }
+    lme_RMSE <- mean(cv.errors_lme)
+    lm_RMSE <- mean(cv.errors_lm)
+}
+sqrt(mean(lme_RMSE))
+sqrt(mean(lm_RMSE))
+```
+
+```{r}
+# using fractal dimensions predicting phenotype
+# using Ten-fold cross-validation to estimate Generalization error
+# Generalization error was evaluated by RMSRE
+k=10
+lme_RMSE <- matrix(0, k)
+lm_RMSE <- matrix(0, k)
+for(i in 1:k){
+    set.seed(4)
+    n=nrow(data1)
+    subn=floor(n/k)
+    location=sample(1: n, n)
+    cv.errors_lme<-matrix(0,k)
+    cv.errors_lm<-matrix(0,k)
+    for(j in 1:k){
+        a <- subn*(j-1)+1
+        b <- subn*j
+        test<-location[c(a:b)]
+        train<-location[-c(a:b)]
+        fit=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+(1|stage), data=data1[train, ])
+        lme_pred = predict(fit, newdata=data1[test,], allow.new.levels = TRUE)
+        cv.errors_lme[j]<-mean((exp(lme_pred)-(data1[test, c('fresh_weight')]))^2/(data1[test, c('fresh_weight')])^2)
+        fit=lm(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW), data=data1[train, ])
+        lm_pred = predict(fit, newdata=data1[test,])
+        cv.errors_lm[j]<-mean((exp(lm_pred)-(data1[test, c('fresh_weight')]))^2/(data1[test, c('fresh_weight')])^2)
+    }
+    lme_RMSE <- mean(cv.errors_lme)
+    lm_RMSE <- mean(cv.errors_lm)
+}
+sqrt(mean(lme_RMSE))
+sqrt(mean(lm_RMSE))
+```
+
+```{r}
+# using fractal dimensions predicting phenotype
+# using Ten-fold cross-validation to estimate Generalization error
+# Generalization error was evaluated by RMSRE
+k=10
+lme_RMSE <- matrix(0, k)
+lm_RMSE <- matrix(0, k)
+for(i in 1:k){
+    set.seed(4)
+    n=nrow(data1)
+    subn=floor(n/k)
+    location=sample(1: n, n)
+    cv.errors_lme<-matrix(0,k)
+    cv.errors_lm<-matrix(0,k)
+    for(j in 1:k){
+        a <- subn*(j-1)+1
+        b <- subn*j
+        test<-location[c(a:b)]
+        train<-location[-c(a:b)]
+        fit=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(RFD)+(1|frac_RFD), data=data1[train, ])
+        lme_pred = predict(fit, newdata=data1[test,], allow.new.levels = TRUE)
+        cv.errors_lme[j]<-mean((exp(lme_pred)-(data1[test, c('fresh_weight')]))^2/(data1[test, c('fresh_weight')])^2)
+        fit=lm(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(RFD), data=data1[train, ])
+        lm_pred = predict(fit, newdata=data1[test,])
+        cv.errors_lm[j]<-mean((exp(lm_pred)-(data1[test, c('fresh_weight')]))^2/(data1[test, c('fresh_weight')])^2)
+    }
+    lme_RMSE <- mean(cv.errors_lme)
+    lm_RMSE <- mean(cv.errors_lm)
+}
+sqrt(mean(lme_RMSE))
+sqrt(mean(lm_RMSE))
+```
+
+```{r}
+# using fractal dimensions predicting phenotype
+# using Ten-fold cross-validation to estimate Generalization error
+# Generalization error was evaluated by RMSRE
+k=10
+lme_RMSE <- matrix(0, k)
+lm_RMSE <- matrix(0, k)
+for(i in 1:k){
+    set.seed(i)
+    n=nrow(data1)
+    subn=floor(n/k)
+    location=sample(1: n, n)
+    cv.errors_lme<-matrix(0,k)
+    cv.errors_lm<-matrix(0,k)
+    for(j in 1:k){
+        a <- subn*(j-1)+1
+        b <- subn*j
+        test<-location[c(a:b)]
+        train<-location[-c(a:b)]
+        fit=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(SandBox)+(1|frac_SandBox), data=data1[train, ])
+        lme_pred = predict(fit, newdata=data1[test,], allow.new.levels = TRUE)
+        cv.errors_lme[j]<-mean((exp(lme_pred)-data1[test, c('fresh_weight')])^2/data1[test, c('fresh_weight')]^2)
+        fit=lm(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(SandBox), data=data1[train, ])
+        lm_pred = predict(fit, newdata=data1[test,])
+        cv.errors_lm[j]<-mean((exp(lm_pred)-data1[test, c('fresh_weight')])^2/data1[test, c('fresh_weight')]^2)
+    }
+    lme_RMSE <- mean(cv.errors_lme)
+    lm_RMSE <- mean(cv.errors_lm)
+}
+sqrt(mean(lme_RMSE))
+sqrt(mean(lm_RMSE))
+
+
+```
+
+```{r}
+# using fractal dimensions predicting phenotype
+# using Ten-fold cross-validation to estimate Generalization error
+# Generalization error was evaluated by RMSRE
+k=10
+lme_RMSE <- matrix(0, k)
+lm_RMSE <- matrix(0, k)
+for(i in 1:k){
+    set.seed(4)
+    n=nrow(data1)
+    subn=floor(n/k)
+    location=sample(1: n, n)
+    cv.errors_lme<-matrix(0,k)
+    cv.errors_lm<-matrix(0,k)
+    for(j in 1:k){
+        a <- subn*(j-1)+1
+        b <- subn*j
+        test<-location[c(a:b)]
+        train<-location[-c(a:b)]
+        fit=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(SFD)+(1|frac_SFD), data=data1[train, ])
+        lme_pred = predict(fit, newdata=data1[test,], allow.new.levels = TRUE)
+        cv.errors_lme[j]<-mean((exp(lme_pred)-(data1[test, c('fresh_weight')]))^2/(data1[test, c('fresh_weight')])^2)
+        fit=lm(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(SFD), data=data1[train, ])
+        lm_pred = predict(fit, newdata=data1[test,])
+        cv.errors_lm[j]<-mean((exp(lm_pred)-(data1[test, c('fresh_weight')]))^2/(data1[test, c('fresh_weight')])^2)
+    }
+    lme_RMSE <- mean(cv.errors_lme)
+    lm_RMSE <- mean(cv.errors_lm)
+}
+sqrt(mean(lme_RMSE))
+sqrt(mean(lm_RMSE))
+```
+
+```{r}
+# using fractal dimensions predicting phenotype
+# using Ten-fold cross-validation to estimate Generalization error
+# Generalization error was evaluated by RMSRE
+k=10
+lme_RMSE <- matrix(0, k)
+lm_RMSE <- matrix(0, k)
+for(i in 1:k){
+    set.seed(i)
+    n=nrow(data1)
+    subn=floor(n/k)
+    location=sample(1: n, n)
+    cv.errors_lme<-matrix(0,k)
+    cv.errors_lm<-matrix(0,k)
+    for(j in 1:k){
+        a <- subn*(j-1)+1
+        b <- subn*j
+        test<-location[c(a:b)]
+        train<-location[-c(a:b)]
+        fit=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(D1)+(1|frac_D1), data=data1[train, ])
+        lme_pred = predict(fit, newdata=data1[test,], allow.new.levels = TRUE)
+        cv.errors_lme[j]<-mean((lme_pred-log(data1[test, c('fresh_weight')]))^2)
+        fit=lm(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(D1), data=data1[train, ])
+        lm_pred = predict(fit, newdata=data1[test,])
+        cv.errors_lm[j]<-mean((lm_pred-log(data1[test, c('fresh_weight')]))^2)
+    }
+    lme_RMSE <- mean(cv.errors_lme)
+    lm_RMSE <- mean(cv.errors_lm)
+}
+sqrt(mean(lme_RMSE))
+sqrt(mean(lm_RMSE))
+```
+```{r}
+# using fractal dimensions predicting phenotype
+# using Ten-fold cross-validation to estimate Generalization error
+# Generalization error was evaluated by RMSRE
+k=10
+lme_RMSE <- matrix(0, k)
+lm_RMSE <- matrix(0, k)
+for(i in 1:k){
+    set.seed(4)
+    n=nrow(data1)
+    subn=floor(n/k)
+    location=sample(1: n, n)
+    cv.errors_lme<-matrix(0,k)
+    cv.errors_lm<-matrix(0,k)
+    for(j in 1:k){
+        a <- subn*(j-1)+1
+        b <- subn*j
+        test<-location[c(a:b)]
+        train<-location[-c(a:b)]
+        fit=lmer(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(D2)+(1|frac_D2), data=data1[train, ])
+        lme_pred = predict(fit, newdata=data1[test,], allow.new.levels = TRUE)
+        cv.errors_lme[j]<-mean((lme_pred-log(data1[test, c('fresh_weight')]))^2)
+        fit=lm(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW)+log(D2), data=data1[train, ])
+        lm_pred = predict(fit, newdata=data1[test,])
+        cv.errors_lm[j]<-mean((lm_pred-log(data1[test, c('fresh_weight')]))^2)
+    }
+    lme_RMSE <- mean(cv.errors_lme)
+    lm_RMSE <- mean(cv.errors_lm)
+}
+mean(lme_RMSE)
+mean(lm_RMSE)
+```
+```{r}
+k=10
+lme_RMSE <- matrix(0, k)
+lm_RMSE <- matrix(0, k)
+for(i in 1:k){
+    set.seed(4)
+    n=nrow(data1)
+    subn=floor(n/k)
+    location=sample(1: n, n)
+    cv.errors_lme<-matrix(0,k)
+    cv.errors_lm<-matrix(0,k)
+    for(j in 1:k){
+        a <- subn*(j-1)+1
+        b <- subn*j
+        test<-location[c(a:b)]
+        train<-location[-c(a:b)]
+        fit=lmer(formula = log(fresh_weight)~log(SFD)+(1|frac_stage), data=data1[train, ])
+        lme_pred = predict(fit, newdata=data1[test,], allow.new.levels = TRUE)
+        cv.errors_lme[j]<-mean((exp(lme_pred)-(data1[test, c('fresh_weight')]))^2/(data1[test, c('fresh_weight')])^2)
+        fit=lm(formula = log(fresh_weight)~log(SFD), data=data1[train, ])
+        lm_pred = predict(fit, newdata=data1[test,])
+        cv.errors_lm[j]<-mean((exp(lm_pred)-(data1[test, c('fresh_weight')]))^2/(data1[test, c('fresh_weight')])^2)
+    }
+    lme_RMSE <- mean(cv.errors_lme)
+    lm_RMSE <- mean(cv.errors_lm)
+}
+sqrt(mean(lme_RMSE))
+sqrt(mean(lm_RMSE))
+```
+
+```{r}
+# using fractal dimensions predicting phenotype
+# using Ten-fold cross-validation to estimate Generalization error
+# Generalization error was evaluated by RMSRE
+k=10
+lme_RMSRE <- matrix(0, k)
+lm_RMSRE <- matrix(0, k)
+for(i in 1:k){
+    set.seed(4)
+    n=nrow(data1)
+    subn=floor(n/k)
+    location=sample(1: n, n)
+    cv.errors_lme<-matrix(0,k)
+    cv.errors_lm<-matrix(0,k)
+    for(j in 1:k){
+        a <- subn*(j-1)+1
+        b <- subn*j
+        test<-location[c(a:b)]
+        train<-location[-c(a:b)]
+        fit=lmer(formula = log(fresh_weight)~log(SandBox)+(1|frac_stage), data=data1[train, ])
+        lme_pred = predict(fit, newdata=data1[test,], allow.new.levels = TRUE)
+        cv.errors_lme[j]<-mean((lme_pred-log(data1[test, c('fresh_weight')]))^2/log(data1[test, c('fresh_weight')])^2)
+        fit=lm(formula = log(fresh_weight)~log(SandBox), data=data1[train, ])
+        lm_pred = predict(fit, newdata=data1[test,])
+        cv.errors_lm[j]<-mean((lm_pred-log(data1[test, c('fresh_weight')]))^2/log(data1[test, c('fresh_weight')])^2)
+    }
+    lme_RMSRE <- mean(cv.errors_lme)
+    lm_RMSRE <- mean(cv.errors_lm)
+}
+mean(lme_RMSRE)
+mean(lm_RMSRE)
+```
+```{r}
+data_s = data1[data1["stage"] == "stage 1",]
+linear_model=lm(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW), data=data_s)
+r.squaredLR(linear_model)
+res <- residuals(linear_model)
+OutVals = boxplot(res)$out
+which(res %in% OutVals)
+res <- res[!res %in% OutVals]  # Remove outliers
+shapiro.test(res)
+durbinWatsonTest(res)
+plot(density(res), main = "Empirical probability density function of residuals", sub = "model = fresh weight")  # Plot the residual probability density plot
+qqnorm(res)  # Draw a QQ map
+qqline(res)  # Draw a straight line corresponding to the QQ diagram
+k=10
+lme_RMSE <- matrix(0, k)
+lm_RMSE <- matrix(0, k)
+for(i in 1:k){
+    set.seed(4)
+    n=nrow(data_s)
+    subn=floor(n/k)
+    location=sample(1: n, n)
+    cv.errors_lme<-matrix(0,k)
+    cv.errors_lm<-matrix(0,k)
+    for(j in 1:k){
+        a <- subn*(j-1)+1
+        b <- subn*j
+        test<-location[c(a:b)]
+        train<-location[-c(a:b)]
+        lm_pred = predict(linear_model, newdata=data_s[test,])
+        cv.errors_lm[j]<-mean((exp(lm_pred)-(data_s[test, c('fresh_weight')]))^2/(data_s[test, c('fresh_weight')])^2)
+    }
+    lm_RMSE <- mean(cv.errors_lm)
+}
+sqrt(mean(lm_RMSE))
+```
+```{r}
+data_s = data1[data1["stage"] == "stage 2",]
+linear_model=lm(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW), data=data_s)
+r.squaredLR(linear_model)
+res <- residuals(linear_model)
+OutVals = boxplot(res)$out
+which(res %in% OutVals)
+res <- res[!res %in% OutVals]  # Remove outliers
+shapiro.test(res)
+durbinWatsonTest(res)
+plot(density(res), main = "Empirical probability density function of residuals", sub = "model = fresh weight")  # Plot the residual probability density plot
+qqnorm(res)  # Draw a QQ map
+qqline(res)  # Draw a straight line corresponding to the QQ diagram
+k=10
+lme_RMSE <- matrix(0, k)
+lm_RMSE <- matrix(0, k)
+for(i in 1:k){
+    set.seed(4)
+    n=nrow(data_s)
+    subn=floor(n/k)
+    location=sample(1: n, n)
+    cv.errors_lme<-matrix(0,k)
+    cv.errors_lm<-matrix(0,k)
+    for(j in 1:k){
+        a <- subn*(j-1)+1
+        b <- subn*j
+        test<-location[c(a:b)]
+        train<-location[-c(a:b)]
+        lm_pred = predict(linear_model, newdata=data_s[test,])
+        cv.errors_lm[j]<-mean((exp(lm_pred)-(data_s[test, c('fresh_weight')]))^2/(data_s[test, c('fresh_weight')])^2)
+    }
+    lm_RMSE <- mean(cv.errors_lm)
+}
+sqrt(mean(lm_RMSE))
+```
+```{r}
+data_s = data1[data1["stage"] == "stage 3",]
+linear_model=lm(formula = log(fresh_weight)~log(PH_V)+log(SA)+log(G_g)+log(f1)+log(LD1)+log(PW), data=data_s)
+r.squaredLR(linear_model)
+res <- residuals(linear_model)
+OutVals = boxplot(res)$out
+which(res %in% OutVals)
+res <- res[!res %in% OutVals]  # Remove outliers
+shapiro.test(res)
+durbinWatsonTest(res)
+plot(density(res), main = "Empirical probability density function of residuals", sub = "model = fresh weight")  # Plot the residual probability density plot
+qqnorm(res)  # Draw a QQ map
+qqline(res)  # Draw a straight line corresponding to the QQ diagram
+k=10
+lme_RMSE <- matrix(0, k)
+lm_RMSE <- matrix(0, k)
+for(i in 1:k){
+    set.seed(4)
+    n=nrow(data_s)
+    subn=floor(n/k)
+    location=sample(1: n, n)
+    cv.errors_lme<-matrix(0,k)
+    cv.errors_lm<-matrix(0,k)
+    for(j in 1:k){
+        a <- subn*(j-1)+1
+        b <- subn*j
+        test<-location[c(a:b)]0
+        train<-location[-c(a:b)]
+        lm_pred = predict(linear_model, newdata=data_s[test,])
+        cv.errors_lm[j]<-mean((exp(lm_pred)-(data_s[test, c('fresh_weight')]))^2/(data_s[test, c('fresh_weight')])^2)
+    }
+    lm_RMSE <- mean(cv.errors_lm)
+}
+sqrt(mean(lm_RMSE))
+```
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
